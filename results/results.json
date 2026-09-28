@@ -8,7 +8,7 @@
     "n_gamma": 800,
     "n_beta": 40,
     "rhobeg": 0.1,
-    "maxiter": 1000,
+    "maxiter": 2000,
     "shots": 10000,
     "seed": 42,
     "n": 4,
