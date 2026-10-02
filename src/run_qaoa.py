@@ -29,7 +29,7 @@ def _output_paths(tag: str) -> tuple[Path, dict[str, Path]]:
     its images always share one name.
     """
     for k in itertools.count(1):
-        run_tag = tag if k == 1 else _tagged(tag, str(k)) if tag else str(k)
+        run_tag = "_".join(filter(None, (tag, str(k) if k > 1 else "")))
         json_path = ROOT / "results" / f"{_tagged('results', run_tag)}.json"
         images = {stem: ROOT / "images" / f"{_tagged(stem, run_tag)}.png"
                   for stem in IMAGES}
@@ -45,8 +45,7 @@ def main(cfg: Config | None = None, tag: str = "") -> dict:
     cfg = cfg or Config()
     r = run(cfg)
     print(f"Starting point from grid search: β = {r.grid.beta0:.3f}, γ = {r.grid.gamma0:.3f}")
-    betas_opt, gammas_opt = r.result.x[:cfg.reps], r.result.x[cfg.reps:]
-    print(f"Optimized: γ* = {np.round(gammas_opt, 4)}, β* = {np.round(betas_opt, 4)}, "
+    print(f"Optimized: γ* = {np.round(r.gamma_opt, 4)}, β* = {np.round(r.beta_opt, 4)}, "
           f"F_C = {r.result.fun:.4f} after {len(r.history)} evaluations")
 
     summary = analyze(r.pf, r.prob)
@@ -65,4 +64,4 @@ def main(cfg: Config | None = None, tag: str = "") -> dict:
 
 
 if __name__ == "__main__":
-    main(tag="p2")
+    main(tag="")

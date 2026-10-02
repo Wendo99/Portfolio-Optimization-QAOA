@@ -17,6 +17,10 @@ from portfolio_qaoa.problem import Portfolio
 from portfolio_qaoa.qaoa import RunResult
 
 
+def _rows(pf: Portfolio, prob: dict, xs) -> dict:
+    return {pf.name(x): {"C": pf.cost(x), "measured": prob[x]} for x in xs}
+
+
 def analyze(pf: Portfolio, prob: dict) -> dict:
     x_opt = pf.optimum
     return {
@@ -25,14 +29,8 @@ def analyze(pf: Portfolio, prob: dict) -> dict:
         "P_opt": prob[x_opt],
         "P_feas_random": len(pf.feasible) / 2 ** pf.n,
         "P_opt_random": 1 / 2 ** pf.n,
-        "feasible_portfolios": {
-            pf.name(x): {"C": pf.cost(x), "measured": prob[x]}
-            for x in pf.feasible
-        },
-        "infeasible_portfolios": {
-            pf.name(x): {"C": pf.cost(x), "measured": prob[x]}
-            for x in sorted(set(pf.all_x) - set(pf.feasible), key=pf.cost)
-        },
+        "feasible_portfolios": _rows(pf, prob, pf.feasible),
+        "infeasible_portfolios": _rows(pf, prob, pf.infeasible),
     }
 
 
@@ -57,7 +55,7 @@ def _git(*args: str) -> str | None:
 
 def save_results(path: Path, r: RunResult, summary: dict) -> None:
     """Everything needed to reproduce and compare a run, and the numbers for the slides."""
-    reps, pf, result = r.cfg.reps, r.pf, r.result
+    pf, result = r.pf, r.result
     status = _git("status", "--porcelain")
     results = {
         "timestamp": datetime.now().astimezone().isoformat(timespec="seconds"),
@@ -66,8 +64,8 @@ def save_results(path: Path, r: RunResult, summary: dict) -> None:
                      "sigma": pf.sigma.tolist()},
         "grid_search": {"beta0": r.grid.beta0, "gamma0": r.grid.gamma0,
                         "expected_cost_min": r.grid.raster.min()},
-        "optimization": {"beta_opt": result.x[:reps].tolist(),
-                         "gamma_opt": result.x[reps:].tolist(),
+        "optimization": {"beta_opt": r.beta_opt.tolist(),
+                         "gamma_opt": r.gamma_opt.tolist(),
                          "expected_cost": result.fun,
                          "cobyla_evaluations": len(r.history),
                          "success": bool(result.success),

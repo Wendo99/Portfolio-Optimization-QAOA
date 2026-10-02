@@ -23,7 +23,6 @@ class QAOA:
                  estimator: StatevectorEstimator):
         self.h_c = h_c
         self.offset = offset
-        self.reps = reps
         self.ansatz = qaoa_ansatz(cost_operator=h_c, reps=reps)
         self.estimator = estimator
         self.history: list[float] = []  # <C> per COBYLA evaluation
@@ -90,11 +89,18 @@ class RunResult:
     cfg: Config
     pf: Portfolio
     h_c: SparsePauliOp
-    offset: float
     grid: GridSearch
     result: OptimizeResult  # x = (β_1…β_p, γ_1…γ_p), fun = expected cost
     history: list[float]  # <C> per COBYLA evaluation
     prob: dict  # measured probability per portfolio x
+
+    @property
+    def beta_opt(self) -> np.ndarray:
+        return self.result.x[:self.cfg.reps]
+
+    @property
+    def gamma_opt(self) -> np.ndarray:
+        return self.result.x[self.cfg.reps:]
 
 
 def run(cfg: Config) -> RunResult:
@@ -119,4 +125,4 @@ def run(cfg: Config) -> RunResult:
 
     # 3. Measuring with the optimal parameters
     prob = sample(qaoa, result.x, pf, sampler, cfg.shots)
-    return RunResult(cfg, pf, h_c, offset, grid, result, list(qaoa.history), prob)
+    return RunResult(cfg, pf, h_c, grid, result, list(qaoa.history), prob)

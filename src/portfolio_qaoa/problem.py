@@ -48,6 +48,11 @@ class Portfolio:
                       key=self.cost)
 
     @cached_property
+    def infeasible(self) -> list[tuple[int, ...]]:
+        """Portfolios violating the budget, sorted by cost."""
+        return sorted(set(self.all_x) - set(self.feasible), key=self.cost)
+
+    @cached_property
     def optimum(self) -> tuple[int, ...]:
         """Best feasible portfolio (brute force)."""
         return self.feasible[0]
@@ -69,7 +74,6 @@ def load_portfolio(cfg: Config) -> Portfolio:
                      budget=cfg.budget, lam=cfg.lam)
 
 
-# %% QUBO -> Ising cost Hamiltonian
 def cost_hamiltonian(pf: Portfolio) -> tuple[SparsePauliOp, float]:
     qp = QuadraticProgram("portfolio")
     for t in pf.ticker:

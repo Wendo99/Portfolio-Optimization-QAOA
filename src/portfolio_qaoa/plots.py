@@ -34,54 +34,47 @@ CIRCUIT_GATE_PT = 13
 CIRCUIT_PARAM_PT = 11
 
 
-def _ordered_cost_terms(h_c: SparsePauliOp) -> list[tuple[list[int], float]]:
-    """Cost terms of H_C as (qubits, coeff), ordered for a narrow figure.
+def _ordered_cost_terms(h_c: SparsePauliOp) -> list[list[int]]:
+    """Qubits of each cost term of H_C, ordered for a narrow figure.
 
     The terms are all diagonal and commute, so they can be reordered freely:
     all Rz first, then the ZZ gates packed into as few columns as possible
     (e.g. ZZ(0,1) and ZZ(2,3) side by side).
     """
-    terms = [(np.flatnonzero(pauli.z).tolist(), coeff)
-             for pauli, coeff in zip(h_c.paulis, h_c.coeffs.real, strict=True)]
-    singles = [t for t in terms if len(t[0]) == 1]
+    terms = [np.flatnonzero(pauli.z).tolist() for pauli in h_c.paulis]
+    singles = [t for t in terms if len(t) == 1]
     # Greedy packing: a ZZ gate joins the first column whose gates' wire spans
     # it does not overlap (the vertical line of ZZ(i, j) covers wires i…j)
     columns: list[list] = []
-    for t in sorted((t for t in terms if len(t[0]) == 2), key=lambda t: t[0]):
-        i, j = t[0]
+    for t in sorted(t for t in terms if len(t) == 2):
+        i, j = t
         col = next((c for c in columns
-                    if all(j < a or b < i for (a, b), _ in c)), None)
+                    if all(j < a or b < i for a, b in c)), None)
         if col is None:
             columns.append(col := [])
         col.append(t)
     return singles + [t for col in columns for t in col]
 
 
-def _append_cost_layer(qc: QuantumCircuit, terms: list, gamma: Parameter,
-                       ks: str, symbolic: bool) -> None:
-    """Append U_C(γ): Z_i -> Rz(2h_i·γ), Z_iZ_j -> Rzz(2J_ij·γ)."""
+def _append_cost_layer(qc: QuantumCircuit, terms: list[list[int]], ks: str) -> None:
+    """Append U_C(γ): Z_i -> Rz(2h_i·γ), Z_iZ_j -> Rzz(2J_ij·γ), labeled symbolically."""
     sep = "" if qc.num_qubits < 10 else ","  # J_12, or J_{10,11} for many qubits
-    for qubits, coeff in terms:
-        if symbolic:
-            idx = sep.join(str(q + 1) for q in qubits)
-            name = "h" if len(qubits) == 1 else "J"
-            angle = Parameter(rf"$2{name}_{{{idx}}}\gamma_{ks}$")
-        else:
-            angle = 2 * coeff * gamma
+    for qubits in terms:
+        idx = sep.join(str(q + 1) for q in qubits)
+        name = "h" if len(qubits) == 1 else "J"
+        angle = Parameter(rf"$2{name}_{{{idx}}}\gamma_{ks}$")
         if len(qubits) == 1:
             qc.rz(angle, qubits[0])
         else:
             qc.rzz(angle, *qubits)
 
 
-def drawing_circuit(h_c: SparsePauliOp, reps: int,
-                    symbolic: bool = True) -> QuantumCircuit:
+def drawing_circuit(h_c: SparsePauliOp, reps: int) -> QuantumCircuit:
     """Gate-level QAOA circuit with labeled layers, for display only.
 
     Same gates as qaoa_ansatz for H_C = Σ h_i Z_i + Σ J_ij Z_i Z_j:
     Z_i -> Rz(2h_i·γ), Z_iZ_j -> Rzz(2J_ij·γ), mixer Rx(2β).
-    symbolic=True labels the angles with h_i, J_ij (no numbers);
-    symbolic=False uses the exact coefficients (for checking against qaoa_ansatz).
+    The angles are labeled with h_i, J_ij (no numbers).
     Measurements are drawn as "M" boxes without classical bits, so the drawer
     places them in one column (real measurements are always staggered).
     The cost terms are reordered to make the figure narrower
@@ -99,13 +92,10 @@ def drawing_circuit(h_c: SparsePauliOp, reps: int,
         # $...$ is rendered by matplotlib mathtext; braces only for k >= 10,
         # since Qiskit truncates barrier labels longer than 16 characters
         ks = str(k) if k < 10 else f"{{{k}}}"
-        gamma = Parameter(rf"$\gamma_{ks}$")
-        beta = Parameter(rf"$\beta_{ks}$")
         qc.barrier(label=rf"$U_C(\gamma_{ks})$")
-        _append_cost_layer(qc, ordered, gamma, ks, symbolic)
+        _append_cost_layer(qc, ordered, ks)
         qc.barrier(label=rf"$U_M(\beta_{ks})$")
-        mixer_angle = Parameter(rf"$2\beta_{ks}$") if symbolic else 2 * beta
-        qc.rx(mixer_angle, range(qc.num_qubits))
+        qc.rx(Parameter(rf"$2\beta_{ks}$"), range(qc.num_qubits))
     qc.barrier(label="Measurement")
     for q in range(qc.num_qubits):
         qc.append(Instruction("M", 1, 0, [], label=r"$\mathcal{M}$"), [q])
@@ -147,8 +137,7 @@ def plot_landscape(grid: GridSearch, path: Path) -> None:
 
 def plot_distribution(pf: Portfolio, prob: dict, cfg: Config, path: Path) -> None:
     """Measurement distribution: feasible portfolios first, sorted by cost."""
-    infeasible = sorted(set(pf.all_x) - set(pf.feasible), key=pf.cost)
-    x_sorted = pf.feasible + infeasible
+    x_sorted = pf.feasible + pf.infeasible
     categories = {"tab:green": "Optimum",
                   "tab:blue": "feasible",
                   "tab:red": "infeasible"}
