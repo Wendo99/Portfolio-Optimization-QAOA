@@ -16,7 +16,7 @@ class DataConfig:
     end: str = "2026-01-01"  # end is exclusive in yfinance
     trading_days_per_year: int = 252
     datafile: str = DEFAULT_DATAFILE
-    pricefile: str = "kurse_2025.csv"
+    pricefile: str = "prices_2025.csv"
 
 
 def load_prices(cfg: DataConfig) -> pd.DataFrame:
@@ -44,8 +44,8 @@ def slide_table(prices: pd.DataFrame, returns: pd.DataFrame,
                 cfg: DataConfig) -> pd.DataFrame:
     """Illustrative figures for slide 10."""
     return pd.DataFrame({
-        "Rendite 2025": prices.iloc[-1] / prices.iloc[0] - 1,
-        "Volatilität p.a.": returns.std() * np.sqrt(cfg.trading_days_per_year),
+        "Return 2025": prices.iloc[-1] / prices.iloc[0] - 1,
+        "Volatility p.a.": returns.std() * np.sqrt(cfg.trading_days_per_year),
     })
 
 

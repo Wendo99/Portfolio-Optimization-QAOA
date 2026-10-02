@@ -106,7 +106,7 @@ def drawing_circuit(h_c: SparsePauliOp, reps: int,
         qc.barrier(label=rf"$U_M(\beta_{ks})$")
         mixer_angle = Parameter(rf"$2\beta_{ks}$") if symbolic else 2 * beta
         qc.rx(mixer_angle, range(qc.num_qubits))
-    qc.barrier(label="Messung")
+    qc.barrier(label="Measurement")
     for q in range(qc.num_qubits):
         qc.append(Instruction("M", 1, 0, [], label=r"$\mathcal{M}$"), [q])
     return qc
@@ -123,8 +123,8 @@ def plot_convergence(history: list[float], reps: int, path: Path) -> None:
     fig, ax = plt.subplots(figsize=(SLIDE_FIG_WIDTH, 5))
     ax.plot(history, marker=".")
     ax.set_xlabel("Iteration (COBYLA)")
-    ax.set_ylabel(r"$F_p$ – erwartete Kosten")
-    ax.set_title(rf"Konvergenz der Parameteroptimierung $(p = {reps})$")
+    ax.set_ylabel(r"$F_p$ – expected cost")
+    ax.set_title(rf"Convergence of the parameter optimization $(p = {reps})$")
     _save(fig, path)
 
 
@@ -133,14 +133,14 @@ def plot_landscape(grid: GridSearch, path: Path) -> None:
     fig, ax = plt.subplots(figsize=(SLIDE_FIG_WIDTH, 5))
     mesh = ax.pcolormesh(grid.gammas, grid.betas, grid.raster, shading="nearest",
                          cmap="viridis")
-    fig.colorbar(mesh, ax=ax, label=r"$F_p$ – erwartete Kosten")
+    fig.colorbar(mesh, ax=ax, label=r"$F_p$ – expected cost")
     ax.plot(grid.gamma0, grid.beta0, marker="*", color="red", markersize=14,
-            label="Minimum (Raster)")
+            label="Minimum (grid)")
     ax.axvline(2 * np.pi, color="white", linestyle="--",
-               label=r"$\gamma = 2\pi$ (übliches Suchfenster)")
+               label=r"$\gamma = 2\pi$ (usual search window)")
     ax.set_xlabel(r"$\gamma$")
     ax.set_ylabel(r"$\beta$")
-    ax.set_title(r"Energielandschaft $F_p(\boldsymbol{\gamma}, \boldsymbol{\beta})$, $p = 1$")
+    ax.set_title(r"Energy landscape $F_p(\boldsymbol{\gamma}, \boldsymbol{\beta})$, $p = 1$")
     ax.legend(loc="upper right", fontsize="small")
     _save(fig, path)
 
@@ -150,8 +150,8 @@ def plot_distribution(pf: Portfolio, prob: dict, cfg: Config, path: Path) -> Non
     infeasible = sorted(set(pf.all_x) - set(pf.feasible), key=pf.cost)
     x_sorted = pf.feasible + infeasible
     categories = {"tab:green": "Optimum",
-                  "tab:blue": "zulässig",
-                  "tab:red": "unzulässig"}
+                  "tab:blue": "feasible",
+                  "tab:red": "infeasible"}
     feasible = set(pf.feasible)
     colors = ["tab:green" if x == pf.optimum
               else "tab:blue" if x in feasible
@@ -163,12 +163,12 @@ def plot_distribution(pf: Portfolio, prob: dict, cfg: Config, path: Path) -> Non
             color=colors)
     ax.invert_yaxis()  # best portfolio at the top
     ax.axvline(1 / 2 ** pf.n, color="gray", linestyle="--",
-               label=rf"Raten $(1/{2 ** pf.n})$")
-    ax.set_xlabel("Messwahrscheinlichkeit")
+               label=rf"Random guess $(1/{2 ** pf.n})$")
+    ax.set_xlabel("Measurement probability")
     # Centred on the figure, not the axes (the long labels shift the axes
     # right). {{\min}}: literal braces; a bare {min} would insert Python's min()
-    fig.suptitle(f"Messverteilung nach Optimierung "
-                 rf"($p = {cfg.reps}$, $\alpha_{{\min}}$, {cfg.shots} Shots)")
+    fig.suptitle(f"Measurement distribution after optimization "
+                 rf"($p = {cfg.reps}$, $\alpha_{{\min}}$, {cfg.shots} shots)")
     # Bar colours are not labelled artists, so their legend entries are
     # added as patches in front of the guessing line
     handles = [Patch(color=c, label=label) for c, label in categories.items()]
@@ -187,7 +187,7 @@ def _adjust_circuit_axes(ax, box_height: float = 0.9, width_pad: float = 1.1,
       labels fit; the label lines move apart.
     - H and M (one-line labels): smaller squares of side `small_size`.
     - All boxes stay centred where Qiskit placed them.
-    - Barrier labels (U_C, U_M, Messung): moved `label_shift` further up.
+    - Barrier labels (U_C, U_M, Measurement): moved `label_shift` further up.
     """
 
     def is_rotation(s: str) -> bool:
@@ -220,7 +220,7 @@ def _adjust_circuit_axes(ax, box_height: float = 0.9, width_pad: float = 1.1,
             for t in inside:
                 t.set_y(yc + (t.get_position()[1] - yc) * factor)
     for t in ax.texts:
-        if t.get_text().startswith("$U_") or t.get_text() == "Messung":
+        if t.get_text().startswith("$U_") or t.get_text() == "Measurement":
             t.set_y(t.get_position()[1] + label_shift)
 
 
@@ -250,7 +250,7 @@ def plot_circuit(h_c: SparsePauliOp, reps: int, ticker, path: Path) -> None:
         _adjust_circuit_axes(fig.axes[0])
         mapping = ", ".join(rf"$x_{{{i}}}$={t}"
                             for i, t in enumerate(ticker, start=1))
-        fig.suptitle(rf"QAOA-Schaltkreis – {mapping}",
+        fig.suptitle(rf"QAOA circuit – {mapping}",
                      fontsize=PRESENTATION_RC["figure.titlesize"] * k)
         fig.savefig(path, dpi=400, bbox_inches="tight")
     plt.close(fig)

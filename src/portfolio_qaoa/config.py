@@ -7,7 +7,7 @@ import numpy as np
 
 ROOT = Path(__file__).resolve().parents[2]
 DATA_DIR = ROOT / "data"
-DEFAULT_DATAFILE = "portfolio_daten.npz"
+DEFAULT_DATAFILE = "portfolio_data.npz"
 
 
 @dataclass(frozen=True)

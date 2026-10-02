@@ -1,6 +1,6 @@
 {
   "parameter": {
-    "datafile": "portfolio_daten.npz",
+    "datafile": "portfolio_data.npz",
     "budget": 2,
     "lam": 0.5,
     "reps": 1,
@@ -12,52 +12,52 @@
     "shots": 10000,
     "seed": 42,
     "n": 4,
-    "alpha": 0.4264234136592978
+    "alpha": 0.42642353444311043
   },
-  "optimierung": {
+  "optimization": {
     "beta_opt": [
-      0.7263379960662684
+      0.7263202823092841
     ],
     "gamma_opt": [
-      40.37556789562572
+      40.37558383388867
     ],
-    "erwartete_kosten": -0.06705435127452386,
-    "auswertungen_cobyla": 48
+    "expected_cost": -0.06705468003695664,
+    "cobyla_evaluations": 39
   },
-  "ergebnis": {
+  "result": {
     "optimum": "GOOG+NVDA",
-    "P_zul": 0.7366,
+    "P_feas": 0.7367,
     "P_opt": 0.5661,
-    "P_zul_raten": 0.375,
-    "P_opt_raten": 0.0625,
-    "zulaessige_portfolios": {
+    "P_feas_random": 0.375,
+    "P_opt_random": 0.0625,
+    "feasible_portfolios": {
       "GOOG+NVDA": {
-        "C": -0.2557076127676121,
-        "gemessen": 0.5661
+        "C": -0.2557077350072957,
+        "measured": 0.5661
       },
       "GOOG+META": {
-        "C": -0.20001902752067946,
-        "gemessen": 0.0418
+        "C": -0.20001904545076613,
+        "measured": 0.0418
       },
       "GOOG+AMZN": {
-        "C": -0.1645275593671646,
-        "gemessen": 0.0145
+        "C": -0.16452761930406054,
+        "measured": 0.0145
       },
       "META+NVDA": {
-        "C": -0.02809553063976855,
-        "gemessen": 0.0569
+        "C": -0.028095521280985247,
+        "measured": 0.0569
       },
       "AMZN+NVDA": {
-        "C": -0.002408530765205863,
-        "gemessen": 0.0513
+        "C": -0.0024085955342756926,
+        "measured": 0.0514
       },
       "AMZN+META": {
-        "C": 0.06583026403861375,
-        "gemessen": 0.006
+        "C": 0.06583024981445312,
+        "measured": 0.006
       }
     }
   },
-  "versionen": {
+  "versions": {
     "python": "3.14.7",
     "qiskit": "2.5.2",
     "qiskit_optimization": "0.7.0",

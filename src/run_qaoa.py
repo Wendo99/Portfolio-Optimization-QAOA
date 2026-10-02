@@ -11,7 +11,7 @@ from portfolio_qaoa.report import analyze, print_summary, save_results
 
 
 def _tagged(stem: str, tag: str) -> str:
-    """Output name for a run variant, e.g. konvergenz_p2."""
+    """Output name for a run variant, e.g. convergence_p2."""
     return f"{stem}_{tag}" if tag else stem
 
 
@@ -19,10 +19,10 @@ def main(cfg: Config | None = None, tag: str = "") -> dict:
     """Run QAOA and write results/results[_tag].json and images/*[_tag].png."""
     cfg = cfg or Config()
     r = run(cfg)
-    print(f"Startpunkt aus Raster: β = {r.grid.beta0:.3f}, γ = {r.grid.gamma0:.3f}")
+    print(f"Starting point from grid search: β = {r.grid.beta0:.3f}, γ = {r.grid.gamma0:.3f}")
     betas_opt, gammas_opt = r.result.x[:cfg.reps], r.result.x[cfg.reps:]
-    print(f"Optimiert: γ* = {np.round(gammas_opt, 4)}, β* = {np.round(betas_opt, 4)}, "
-          f"F_C = {r.result.fun:.4f} nach {len(r.history)} Auswertungen")
+    print(f"Optimized: γ* = {np.round(gammas_opt, 4)}, β* = {np.round(betas_opt, 4)}, "
+          f"F_C = {r.result.fun:.4f} after {len(r.history)} evaluations")
 
     summary = analyze(r.pf, r.prob)
     print_summary(r.pf, summary)
@@ -36,10 +36,10 @@ def main(cfg: Config | None = None, tag: str = "") -> dict:
         return images / f"{_tagged(stem, tag)}.png"
 
     with plt.rc_context(PRESENTATION_RC):
-        plot_convergence(r.history, cfg.reps, image("konvergenz"))
-        plot_landscape(r.grid, image("energielandschaft"))
-        plot_distribution(r.pf, r.prob, cfg, image("messverteilung"))
-        plot_circuit(r.h_c, cfg.reps, r.pf.ticker, image("qaoa_schaltkreis"))
+        plot_convergence(r.history, cfg.reps, image("convergence"))
+        plot_landscape(r.grid, image("energy_landscape"))
+        plot_distribution(r.pf, r.prob, cfg, image("measurement_distribution"))
+        plot_circuit(r.h_c, cfg.reps, r.pf.ticker, image("qaoa_circuit"))
     return summary
 
 
