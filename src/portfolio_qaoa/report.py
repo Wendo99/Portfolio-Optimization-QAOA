@@ -1,8 +1,10 @@
 """Analysis of the measurement distribution and results.json."""
 
 import json
+import subprocess
 import sys
 from dataclasses import asdict
+from datetime import datetime
 from pathlib import Path
 
 import numpy as np
@@ -10,8 +12,9 @@ import qiskit
 import qiskit_optimization
 import scipy
 
-from portfolio_qaoa.config import Config
+from portfolio_qaoa.config import ROOT
 from portfolio_qaoa.problem import Portfolio
+from portfolio_qaoa.qaoa import RunResult
 
 
 def analyze(pf: Portfolio, prob: dict) -> dict:
@@ -25,6 +28,10 @@ def analyze(pf: Portfolio, prob: dict) -> dict:
         "feasible_portfolios": {
             pf.name(x): {"C": pf.cost(x), "measured": prob[x]}
             for x in pf.feasible
+        },
+        "infeasible_portfolios": {
+            pf.name(x): {"C": pf.cost(x), "measured": prob[x]}
+            for x in sorted(set(pf.all_x) - set(pf.feasible), key=pf.cost)
         },
     }
 
@@ -40,21 +47,39 @@ def print_summary(pf: Portfolio, summary: dict) -> None:
         print(f"  {label:10s} C = {row['C']:+.4f}   measured: {row['measured']:.1%}")
 
 
-def save_results(path: Path, cfg: Config, pf: Portfolio, result, n_evals: int,
-                 summary: dict) -> None:
-    """Source for all numbers on the slides."""
-    reps = cfg.reps
+def _git(*args: str) -> str | None:
+    try:
+        return subprocess.run(["git", *args], cwd=ROOT, capture_output=True,
+                              text=True, check=True).stdout.strip()
+    except (OSError, subprocess.CalledProcessError):
+        return None
+
+
+def save_results(path: Path, r: RunResult, summary: dict) -> None:
+    """Everything needed to reproduce and compare a run, and the numbers for the slides."""
+    reps, pf, result = r.cfg.reps, r.pf, r.result
+    status = _git("status", "--porcelain")
     results = {
-        "parameter": {**asdict(cfg), "n": pf.n, "alpha": pf.alpha},
+        "timestamp": datetime.now().astimezone().isoformat(timespec="seconds"),
+        "parameter": {**asdict(r.cfg), "n": pf.n, "alpha": pf.alpha},
+        "instance": {"ticker": pf.ticker.tolist(), "mu": pf.mu.tolist(),
+                     "sigma": pf.sigma.tolist()},
+        "grid_search": {"beta0": r.grid.beta0, "gamma0": r.grid.gamma0,
+                        "expected_cost_min": r.grid.raster.min()},
         "optimization": {"beta_opt": result.x[:reps].tolist(),
                          "gamma_opt": result.x[reps:].tolist(),
                          "expected_cost": result.fun,
-                         "cobyla_evaluations": n_evals},
+                         "cobyla_evaluations": len(r.history),
+                         "success": bool(result.success),
+                         "message": result.message,
+                         "history": r.history},
         "result": summary,
         "versions": {"python": sys.version.split()[0],
                      "qiskit": qiskit.__version__,
                      "qiskit_optimization": qiskit_optimization.__version__,
-                     "numpy": np.__version__, "scipy": scipy.__version__},
+                     "numpy": np.__version__, "scipy": scipy.__version__,
+                     "git_commit": _git("rev-parse", "HEAD"),
+                     "git_dirty": None if status is None else bool(status)},
     }
     path.parent.mkdir(exist_ok=True)
     with open(path, "w", encoding="utf-8") as f:

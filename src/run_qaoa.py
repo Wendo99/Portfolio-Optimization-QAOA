@@ -26,8 +26,7 @@ def main(cfg: Config | None = None, tag: str = "") -> dict:
 
     summary = analyze(r.pf, r.prob)
     print_summary(r.pf, summary)
-    save_results(ROOT / "results" / f"{_tagged('results', tag)}.json", cfg, r.pf,
-                 r.result, len(r.history), summary)
+    save_results(ROOT / "results" / f"{_tagged('results', tag)}.json", r, summary)
 
     images = ROOT / "images"
     images.mkdir(exist_ok=True)
