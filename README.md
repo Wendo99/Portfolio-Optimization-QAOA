@@ -1,4 +1,4 @@
-# QAOA – Portfolio Optimization Demo
+# Portfolio-Optimization-QAOA
 
 WORK IN PROGRESS
 
