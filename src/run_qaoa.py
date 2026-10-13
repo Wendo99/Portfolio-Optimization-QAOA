@@ -12,7 +12,6 @@ from portfolio_qaoa.plots import (PRESENTATION_RC, plot_circuit, plot_convergenc
 from portfolio_qaoa.qaoa import run
 from portfolio_qaoa.report import analyze, print_summary, save_results
 
-
 IMAGES = ("convergence", "energy_landscape", "measurement_distribution", "qaoa_circuit")
 
 

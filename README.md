@@ -2,75 +2,85 @@
 
 WORK IN PROGRESS
 
-A demonstration of portfolio optimization with **Quantum Approximate Optimization Algorithm (QAOA)** implemented with IBMs Quantum Framework Qiskit.
+A technical demonstration mapping a classical financial optimization problem (Markowitz
+mean-variance) to a combinatorial Quadratic Unconstrained Binary Optimization (QUBO) problem, solved
+via the Quantum Approximate Optimization Algorithm (QAOA) using IBM Qiskit.
 
-The project explores how a classical financial optimization problem can be transformed into a combinatorial optimization problem and subsequently formulated for a quantum optimization algorithm.
+The project explores how a classical financial optimization problem can be transformed into a
+combinatorial optimization problem and subsequently formulated for a quantum optimization algorithm.
 
 ## Overview
 
 Portfolio optimization aims to find an allocation that balances expected return and risk.
+Historical market data is obtained using [`yfinance`](https://github.com/ranaroussi/yfinance).
 
-The optimization objective combines expected returns and portfolio risk and is formulated in a Markowitz mean-variance model. The resulting Quadratic Unconstrained Binary Optimization (QUBO) is then mapped to an Ising Hamiltonian and used as the cost Hamiltonian for QAOA.
+The optimization objective combines expected returns and portfolio risk and is formulated in a
+Markowitz mean-variance model. The resulting Quadratic Unconstrained Binary Optimization (QUBO) is
+then mapped to an Ising Hamiltonian and used as the cost Hamiltonian for QAOA.
 
 The project therefore follows the workflow:
 
 ```text
-Market Data
+Market Data (yfinance)
     ↓
-Returns & Covariance Matrix
+Expected Returns & Covariance Matrix
     ↓
-Portfolio Optimization Model
+Markowitz Mean-Variance Model (Budget constraint)
     ↓
-QUBO Formulation
+QUBO Formulation (Penalty factor α)
     ↓
-Ising Hamiltonian
+Ising Hamiltonian (Cost operator H_C)
     ↓
-QAOA
+QAOA Circuit (Statevector Simulation & COBYLA)
     ↓
 Measurement & Evaluation
 ```
 
-Historical market data is obtained using [`yfinance`](https://github.com/ranaroussi/yfinance).
+## Results
 
-The optimization uses a fixed four-asset instance. Each binary variable indicates whether an asset is selected; the budget is exactly two assets.
+The model selects exactly 2 out of 4 assets (GOOG, AMZN, META, NVDA) based on 2025 historical data.
+The exact analytical optimum is GOOG+NVDA.
+The QAOA implementation successfully shifts the measurement distribution away from random guessing
+(6.25% for the optimal state) towards the feasible optimum:
+Depth $p=1$: Measured probability of the optimal portfolio: 56.6%
+Depth $p=2$: Measured probability of the optimal portfolio: 62.7% (Parameters optimized via COBYLA
+on a deterministic statevector simulator).
 
 ## Project Structure
 
-```text
-Portfolio_Optimization_Demo/
-├── data/       # Input and processed data
-├── images/     # Figures and visualizations
-├── results/    # Generated results
-├── src/        # Source code
-├── pyproject.toml
-└── uv.lock
-```
+- data/: Frozen historical market data (.csv and .npz) to guarantee deterministic execution.
+- src/:
+    - 01_daten_portfolio.py: Data acquisition and annualization.
+    - 02_portfolio_optimization.py: QUBO conversion, Hamiltonian validation, QAOA circuit
+      generation, grid search, and optimization.
+- results/: Tracked JSON outputs of optimization runs.
+- images/: Generated matplotlib figures (convergence, landscapes, circuit diagrams).
+
+## Scope and Honest Limitations
+
+This is purely an educational demonstration of encoding binary asset-selection into a QUBO and
+sampling it via QAOA.
+
+- No Quantum Advantage: The default instance handles 4 assets (16 total states) and is simulated
+  classically. The exact feasible optimum is trivially found by enumeration.
+- Simplified Financial Model: It uses historical estimates from a single year and does not model
+  continuous asset weights, share counts, transaction costs, or trading constraints.
+- Disclaimer: This project does not constitute financial advice or an investment recommendation.
 
 ## Installation and Run
+
+Built with Python 3.14+ and Qiskit 2.5+.
 
 Clone the repository:
 
 ```bash
-git clone https://github.com/Wendo99/Portfolio_Optimization_Demo.git
+# Clone the repository
+git clone [https://github.com/Wendo99/Portfolio_Optimization_Demo.git](https://github.com/Wendo99/Portfolio_Optimization_Demo.git)
 cd Portfolio_Optimization_Demo
-```
 
-Install the project and its dependencies using your preferred Python package manager.
-
-For example, with `uv`:
-
-```bash
+# Install dependencies via uv
 uv sync
+
+# Run the optimization pipeline
+uv run python src/02_portfolio_optimization.py
 ```
-
-Run the corresponding Python module or script from the `src` directory according to the project configuration.
-
-Generated figures and results are stored in the respective `images/` and `results/` directories.
-
-## Scope and Limitations
-
-This is a small demonstration of encoding a binary asset-selection problem as a QUBO and sampling it with QAOA. The default instance has four assets and selects exactly two. It uses historical estimates from a single year and a statevector simulator, and it does not model asset weights, share counts, transaction costs, trading constraints, or a monetary budget. It is not a production portfolio tool and does not demonstrate quantum advantage; the exact feasible optimum is also found by enumerating all 16 portfolios.
-
-## Disclaimer
-
-This project is for educational and technical demonstration purposes only. It does not constitute financial advice or an investment recommendation.

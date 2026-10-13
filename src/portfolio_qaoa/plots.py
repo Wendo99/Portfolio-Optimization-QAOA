@@ -5,9 +5,8 @@ from pathlib import Path
 
 import numpy as np
 from matplotlib import pyplot as plt
-from matplotlib.patches import Patch, Rectangle
-from qiskit import QuantumCircuit, QuantumRegister
-from qiskit.circuit import Instruction, Parameter
+from matplotlib.patches import Patch
+from qiskit.circuit.library import qaoa_ansatz
 from qiskit.quantum_info import SparsePauliOp
 
 from portfolio_qaoa.config import Config
@@ -32,74 +31,6 @@ PRESENTATION_RC = {
 # and with ~22 gate columns a column is only ~0.5 in wide at slide width.
 CIRCUIT_GATE_PT = 13
 CIRCUIT_PARAM_PT = 11
-
-
-def _ordered_cost_terms(h_c: SparsePauliOp) -> list[list[int]]:
-    """Qubits of each cost term of H_C, ordered for a narrow figure.
-
-    The terms are all diagonal and commute, so they can be reordered freely:
-    all Rz first, then the ZZ gates packed into as few columns as possible
-    (e.g. ZZ(0,1) and ZZ(2,3) side by side).
-    """
-    terms = [np.flatnonzero(pauli.z).tolist() for pauli in h_c.paulis]
-    singles = [t for t in terms if len(t) == 1]
-    # Greedy packing: a ZZ gate joins the first column whose gates' wire spans
-    # it does not overlap (the vertical line of ZZ(i, j) covers wires i…j)
-    columns: list[list] = []
-    for t in sorted(t for t in terms if len(t) == 2):
-        i, j = t
-        col = next((c for c in columns
-                    if all(j < a or b < i for a, b in c)), None)
-        if col is None:
-            columns.append(col := [])
-        col.append(t)
-    return singles + [t for col in columns for t in col]
-
-
-def _append_cost_layer(qc: QuantumCircuit, terms: list[list[int]], ks: str) -> None:
-    """Append U_C(γ): Z_i -> Rz(2h_i·γ), Z_iZ_j -> Rzz(2J_ij·γ), labeled symbolically."""
-    sep = "" if qc.num_qubits < 10 else ","  # J_12, or J_{10,11} for many qubits
-    for qubits in terms:
-        idx = sep.join(str(q + 1) for q in qubits)
-        name = "h" if len(qubits) == 1 else "J"
-        angle = Parameter(rf"$2{name}_{{{idx}}}\gamma_{ks}$")
-        if len(qubits) == 1:
-            qc.rz(angle, qubits[0])
-        else:
-            qc.rzz(angle, *qubits)
-
-
-def drawing_circuit(h_c: SparsePauliOp, reps: int) -> QuantumCircuit:
-    """Gate-level QAOA circuit with labeled layers, for display only.
-
-    Same gates as qaoa_ansatz for H_C = Σ h_i Z_i + Σ J_ij Z_i Z_j:
-    Z_i -> Rz(2h_i·γ), Z_iZ_j -> Rzz(2J_ij·γ), mixer Rx(2β).
-    The angles are labeled with h_i, J_ij (no numbers).
-    Measurements are drawn as "M" boxes without classical bits, so the drawer
-    places them in one column (real measurements are always staggered).
-    The cost terms are reordered to make the figure narrower
-    (see _ordered_cost_terms).
-    """
-    ordered = _ordered_cost_terms(h_c)
-
-    # ASCII names; plot_circuit turns them into $x_{i}$ (Qiskit escapes "_")
-    regs = [QuantumRegister(1, f"x{i + 1}") for i in range(h_c.num_qubits)]
-    qc = QuantumCircuit(*regs)
-    # Each barrier label marks the block that follows it;
-    # the initial state is shown by the |0⟩ wire labels
-    qc.h(range(qc.num_qubits))
-    for k in range(1, reps + 1):
-        # $...$ is rendered by matplotlib mathtext; braces only for k >= 10,
-        # since Qiskit truncates barrier labels longer than 16 characters
-        ks = str(k) if k < 10 else f"{{{k}}}"
-        qc.barrier(label=rf"$U_C(\gamma_{ks})$")
-        _append_cost_layer(qc, ordered, ks)
-        qc.barrier(label=rf"$U_M(\beta_{ks})$")
-        qc.rx(Parameter(rf"$2\beta_{ks}$"), range(qc.num_qubits))
-    qc.barrier(label="Measurement")
-    for q in range(qc.num_qubits):
-        qc.append(Instruction("M", 1, 0, [], label=r"$\mathcal{M}$"), [q])
-    return qc
 
 
 def _save(fig, path: Path) -> None:
@@ -138,13 +69,13 @@ def plot_landscape(grid: GridSearch, path: Path) -> None:
 def plot_distribution(pf: Portfolio, prob: dict, cfg: Config, path: Path) -> None:
     """Measurement distribution: feasible portfolios first, sorted by cost."""
     x_sorted = pf.feasible + pf.infeasible
-    categories = {"tab:green": "Optimum",
+    categories = {"tab:green": "optimum",
                   "tab:blue": "feasible",
                   "tab:red": "infeasible"}
     feasible = set(pf.feasible)
     colors = ["tab:green" if x == pf.optimum
               else "tab:blue" if x in feasible
-              else "tab:red" for x in x_sorted]
+    else "tab:red" for x in x_sorted]
     # Horizontal bars: the 16 portfolio names stay readable at presentation
     # font size (vertical bars would need rotated or overlapping labels)
     fig, ax = plt.subplots(figsize=(SLIDE_FIG_WIDTH, 6.5))
@@ -158,7 +89,7 @@ def plot_distribution(pf: Portfolio, prob: dict, cfg: Config, path: Path) -> Non
     # right). {{\min}}: literal braces; a bare {min} would insert Python's min()
     fig.suptitle(f"Measurement distribution after optimization "
                  rf"($p = {cfg.reps}$, $\alpha_{{\min}}$, {cfg.shots} shots)")
-    # Bar colours are not labelled artists, so their legend entries are
+    # Bar colors are not labeled artists, so their legend entries are
     # added as patches in front of the guessing line
     handles = [Patch(color=c, label=label) for c, label in categories.items()]
     ax.legend(handles=handles + ax.get_legend_handles_labels()[0],
@@ -166,80 +97,16 @@ def plot_distribution(pf: Portfolio, prob: dict, cfg: Config, path: Path) -> Non
     _save(fig, path)
 
 
-def _adjust_circuit_axes(ax, box_height: float = 0.9, width_pad: float = 1.1,
-                         small_size: float = 0.7,
-                         label_shift: float = 0.2) -> None:
-    """Post-process Qiskit's circuit figure (not configurable in its drawer).
-
-    - Rotation gates (Rz, Rx): `box_height` tall (Qiskit: fixed 0.65, wire
-      spacing = 1) and `width_pad` × the widest of them wide, so the two-line
-      labels fit; the label lines move apart.
-    - H and M (one-line labels): smaller squares of side `small_size`.
-    - All boxes stay centred where Qiskit placed them.
-    - Barrier labels (U_C, U_M, Measurement): moved `label_shift` further up.
-    """
-
-    def is_rotation(s: str) -> bool:
-        return s.startswith(r"$\mathrm{R_")
-
-    def is_small(s: str) -> bool:
-        return s in ("H", r"$\mathcal{M}$")
-
-    rotations, smalls = [], []  # (box, texts inside it)
-    for box in [p for p in ax.patches if type(p) is Rectangle]:
-        x0, y0 = box.get_xy()
-        w, h = box.get_width(), box.get_height()
-        inside = [t for t in ax.texts
-                  if x0 <= t.get_position()[0] <= x0 + w
-                  and y0 <= t.get_position()[1] <= y0 + h]
-        labels = [t.get_text() for t in inside]
-        if any(map(is_rotation, labels)):
-            rotations.append((box, inside))
-        elif any(map(is_small, labels)):
-            smalls.append((box, inside))
-    rot_width = width_pad * max((b.get_width() for b, _ in rotations), default=0)
-    for group, (width, height) in ((rotations, (rot_width, box_height)),
-                                   (smalls, (small_size, small_size))):
-        for box, inside in group:
-            x0, y0 = box.get_xy()
-            xc = x0 + box.get_width() / 2
-            yc = y0 + box.get_height() / 2
-            factor = height / box.get_height()
-            box.set_bounds(xc - width / 2, yc - height / 2, width, height)
-            for t in inside:
-                t.set_y(yc + (t.get_position()[1] - yc) * factor)
-    for t in ax.texts:
-        if t.get_text().startswith("$U_") or t.get_text() == "Measurement":
-            t.set_y(t.get_position()[1] + label_shift)
-
-
 def plot_circuit(h_c: SparsePauliOp, reps: int, ticker, path: Path) -> None:
     """Gate-level QAOA circuit: |0⟩, H, cost layer, mixer, measurement."""
-    qc = drawing_circuit(h_c, reps)
+    qc = qaoa_ansatz(h_c, reps)
+    qc.measure_all()
     style = {"name": "iqp", "displaycolor": {"M": ("#A0A0A0", "#000000")}}
-    # Computer Modern (LaTeX font) for all $...$ math
-    with plt.rc_context({"mathtext.fontset": "cm"}):
-        # Qiskit sizes the figure from the gate layout (about 22 in for p = 1),
-        # not from the font size. Scale the fonts by width / slide width so
-        # they reach the CIRCUIT_*_PT sizes when shown at slide width.
-        probe = qc.draw("mpl", initial_state=True, fold=-1, style=style)
-        # width after bbox_inches="tight" (Qiskit adds white margins)
-        k = probe.get_tightbbox().width / SLIDE_FIG_WIDTH
-        plt.close(probe)
-        style |= {"fontsize": CIRCUIT_GATE_PT * k,
-                  "subfontsize": CIRCUIT_PARAM_PT * k}
-        fig = qc.draw("mpl", initial_state=True, fold=-1, style=style)
-        # Qiskit labels the wires "${x1}$ $|0\rangle$" -> "$x_{1}$ $∣0⟩$".
-        # mathtext's \rangle is too big next to "|"; the Unicode glyphs
-        # ∣ (U+2223) and ⟩ (U+27E9) have equal height in Computer Modern,
-        # like \left|0\right\rangle in LaTeX
-        for text in fig.axes[0].texts:
-            label = re.sub(r"^\$\{x(\d+)}\$", r"$x_{\1}$", text.get_text())
-            text.set_text(label.replace(r"$|0\rangle$", "$∣0⟩$"))
-        _adjust_circuit_axes(fig.axes[0])
-        mapping = ", ".join(rf"$x_{{{i}}}$={t}"
-                            for i, t in enumerate(ticker, start=1))
-        fig.suptitle(rf"QAOA circuit – {mapping}",
-                     fontsize=PRESENTATION_RC["figure.titlesize"] * k)
-        fig.savefig(path, dpi=400, bbox_inches="tight")
+    fig = qc.draw("mpl", initial_state=True, fold=-1, style=style, justify="left",
+                  vertical_compression="high", idle_wires=False)
+    mapping = ", ".join(rf"$x_{{{i}}}$={t}"
+                        for i, t in enumerate(ticker, start=1))
+    fig.suptitle(rf"QAOA circuit – {mapping}",
+                 fontsize=PRESENTATION_RC["figure.titlesize"])
+    fig.savefig(path, dpi=400, bbox_inches="tight")
     plt.close(fig)
