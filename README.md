@@ -40,21 +40,24 @@ Measurement & Evaluation
 
 The model selects exactly 2 out of 4 assets (GOOG, AMZN, META, NVDA) based on 2025 historical data.
 The exact analytical optimum is GOOG+NVDA.
+
 The QAOA implementation successfully shifts the measurement distribution away from random guessing
 (6.25% for the optimal state) towards the feasible optimum:
 Depth $p=1$: Measured probability of the optimal portfolio: 56.6%
-Depth $p=2$: Measured probability of the optimal portfolio: 62.7% (Parameters optimized via COBYLA
-on a deterministic statevector simulator).
+Depth $p=2$: Measured probability of the optimal portfolio: 62.7% 
+
+(Parameters optimized via COBYLA on a deterministic statevector simulator).
 
 ## Project Structure
 
-- data/: Frozen historical market data (.csv and .npz) to guarantee deterministic execution.
-- src/:
-    - 01_daten_portfolio.py: Data acquisition and annualization.
-    - 02_portfolio_optimization.py: QUBO conversion, Hamiltonian validation, QAOA circuit
-      generation, grid search, and optimization.
-- results/: Tracked JSON outputs of optimization runs.
-- images/: Generated matplotlib figures (convergence, landscapes, circuit diagrams).
+The project is structured as a modular Python package (portfolio_qaoa).
+
+- `data/`: Frozen historical market data (.csv and .npz) to guarantee deterministic execution.
+- `src/portfolio_qaoa/`: The core package module containing the financial model, QUBO conversion, QAOA execution, and reporting logic.
+- `src/run_data.py`: Script for data acquisition and annualization.
+- `src/run_qaoa.py`: Main execution script for the quantum optimization pipeline.
+- `results/`: Tracked JSON outputs of optimization runs (includes Git commit hashes for reproducibility).
+- `images/`: Generated matplotlib figures (convergence, landscapes, circuit diagrams).
 
 ## Scope and Honest Limitations
 
@@ -82,5 +85,5 @@ cd Portfolio_Optimization_Demo
 uv sync
 
 # Run the optimization pipeline
-uv run python src/02_portfolio_optimization.py
+uv run python src/run_qaoa.py
 ```
